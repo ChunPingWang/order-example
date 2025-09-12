@@ -1,0 +1,1662 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "付款微服務 API",
+    "description": "提供付款處理、支付方式管理和交易查詢的 API",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8084",
+      "description": "開發環境"
+    }
+  ],
+  "tags": [
+    {
+      "name": "payments",
+      "description": "付款相關操作"
+    },
+    {
+      "name": "payment-methods",
+      "description": "支付方式相關操作"
+    },
+    {
+      "name": "transactions",
+      "description": "交易記錄相關操作"
+    }
+  ],
+  "paths": {
+    "/payments": {
+      "get": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "獲取付款列表",
+        "operationId": "getPayments",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "頁碼（從0開始）",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "每頁項目數",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "排序條件",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "createdAt,desc"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "付款狀態過濾",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["PENDING", "AUTHORIZED", "COMPLETED", "REFUNDED", "FAILED", "CANCELLED"]
+            }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "description": "按使用者ID過濾",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功返回付款列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedPaymentResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "ROLE_ADMIN",
+              "ROLE_FINANCE"
+            ]
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "創建新付款",
+        "operationId": "createPayment",
+        "requestBody": {
+          "description": "付款創建請求",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "付款創建成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "請求資料無效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "訂單或使用者不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/payments/{id}": {
+      "get": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "獲取指定付款",
+        "operationId": "getPaymentById",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "付款 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功返回付款資訊",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentDetailResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "付款不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/payments/{id}/cancel": {
+      "put": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "取消付款",
+        "operationId": "cancelPayment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "付款 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "取消付款請求",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentCancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "付款取消成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "無法取消付款（例如狀態不允許）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "付款不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/payments/{id}/authorize": {
+      "put": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "授權付款",
+        "operationId": "authorizePayment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "付款 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "付款授權請求",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentAuthorizeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "付款授權成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "無法授權付款（例如狀態不允許）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "付款不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/payments/{id}/capture": {
+      "put": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "捕獲授權付款（完成付款）",
+        "operationId": "capturePayment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "付款 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "付款捕獲請求",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentCaptureRequest"
+              }
+            }
+          },
+          "required": false
+        },
+        "responses": {
+          "200": {
+            "description": "付款捕獲成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "無法捕獲付款（例如狀態不允許）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "付款不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/payments/{id}/refund": {
+      "post": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "退款",
+        "operationId": "refundPayment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "付款 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "退款請求",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefundRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "退款成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "無法退款（例如狀態不允許）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "付款不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "ROLE_ADMIN",
+              "ROLE_FINANCE"
+            ]
+          }
+        ]
+      }
+    },
+    "/payments/by-order/{orderId}": {
+      "get": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "獲取指定訂單的付款",
+        "operationId": "getPaymentByOrderId",
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "description": "訂單 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功返回付款資訊",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentDetailResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "付款不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/payment-methods/users/{userId}": {
+      "get": {
+        "tags": [
+          "payment-methods"
+        ],
+        "summary": "獲取使用者的支付方式列表",
+        "operationId": "getUserPaymentMethods",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "description": "使用者 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功返回使用者的支付方式列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PaymentMethodResponse"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "使用者不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "payment-methods"
+        ],
+        "summary": "新增使用者支付方式",
+        "operationId": "addUserPaymentMethod",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "description": "使用者 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "支付方式新增請求",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentMethodCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "支付方式新增成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentMethodResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "請求資料無效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "使用者不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/payment-methods/users/{userId}/{methodId}": {
+      "delete": {
+        "tags": [
+          "payment-methods"
+        ],
+        "summary": "刪除使用者支付方式",
+        "operationId": "deleteUserPaymentMethod",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "description": "使用者 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "methodId",
+            "in": "path",
+            "description": "支付方式 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "支付方式刪除成功"
+          },
+          "404": {
+            "description": "使用者或支付方式不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "支付方式無法刪除（例如有關聯交易）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/payment-methods/users/{userId}/{methodId}/default": {
+      "put": {
+        "tags": [
+          "payment-methods"
+        ],
+        "summary": "設定預設支付方式",
+        "operationId": "setDefaultUserPaymentMethod",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "description": "使用者 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "methodId",
+            "in": "path",
+            "description": "支付方式 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "預設支付方式設定成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentMethodResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "使用者或支付方式不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/transactions": {
+      "get": {
+        "tags": [
+          "transactions"
+        ],
+        "summary": "獲取交易記錄列表",
+        "operationId": "getTransactions",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "頁碼（從0開始）",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "每頁項目數",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "排序條件",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "timestamp,desc"
+            }
+          },
+          {
+            "name": "paymentId",
+            "in": "query",
+            "description": "按付款 ID 過濾",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "按交易類型過濾",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["PAYMENT", "REFUND", "CHARGEBACK", "FEE"]
+            }
+          },
+          {
+            "name": "fromDate",
+            "in": "query",
+            "description": "開始日期",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "toDate",
+            "in": "query",
+            "description": "結束日期",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功返回交易記錄列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedTransactionResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "ROLE_ADMIN",
+              "ROLE_FINANCE"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "PaymentCreateRequest": {
+        "type": "object",
+        "required": [
+          "orderId",
+          "userId",
+          "amount",
+          "paymentMethod"
+        ],
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "amount": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "number",
+                "format": "double",
+                "example": 30000.00
+              },
+              "currency": {
+                "type": "string",
+                "example": "TWD"
+              }
+            }
+          },
+          "paymentMethod": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["CREDIT_CARD", "LINE_PAY", "APPLE_PAY", "GOOGLE_PAY", "ATM_TRANSFER", "VIRTUAL_ACCOUNT", "CVS"],
+                "example": "CREDIT_CARD"
+              },
+              "savedMethodId": {
+                "type": "string",
+                "format": "uuid",
+                "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+              },
+              "details": {
+                "type": "object",
+                "additionalProperties": true,
+                "example": {
+                  "cardHolderName": "王小明",
+                  "maskedCardNumber": "************1234",
+                  "expiryDate": {
+                    "month": 12,
+                    "year": 2025
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "PaymentCancelRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "example": "使用者請求取消"
+          }
+        }
+      },
+      "PaymentAuthorizeRequest": {
+        "type": "object",
+        "required": [
+          "transactionReference"
+        ],
+        "properties": {
+          "transactionReference": {
+            "type": "string",
+            "example": "AUTH12345678"
+          },
+          "authorizationDetails": {
+            "type": "object",
+            "additionalProperties": true,
+            "example": {
+              "authCode": "123456",
+              "processorResponseCode": "00"
+            }
+          }
+        }
+      },
+      "PaymentCaptureRequest": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "number",
+                "format": "double",
+                "example": 30000.00
+              },
+              "currency": {
+                "type": "string",
+                "example": "TWD"
+              }
+            }
+          }
+        }
+      },
+      "RefundRequest": {
+        "type": "object",
+        "required": [
+          "amount",
+          "reason"
+        ],
+        "properties": {
+          "amount": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "number",
+                "format": "double",
+                "example": 30000.00
+              },
+              "currency": {
+                "type": "string",
+                "example": "TWD"
+              }
+            }
+          },
+          "reason": {
+            "type": "string",
+            "example": "客戶退貨"
+          },
+          "notes": {
+            "type": "string",
+            "example": "產品有瑕疵"
+          }
+        }
+      },
+      "PaymentMethodCreateRequest": {
+        "type": "object",
+        "required": [
+          "type",
+          "details"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["CREDIT_CARD", "LINE_PAY", "APPLE_PAY", "GOOGLE_PAY"],
+            "example": "CREDIT_CARD"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true,
+            "example": {
+              "cardHolderName": "王小明",
+              "cardNumber": "4111111111111111",
+              "expiryDate": {
+                "month": 12,
+                "year": 2025
+              },
+              "cvv": "123"
+            }
+          },
+          "isDefault": {
+            "type": "boolean",
+            "example": false
+          },
+          "billingAddress": {
+            "type": "object",
+            "properties": {
+              "street": {
+                "type": "string",
+                "example": "信義路五段7號"
+              },
+              "city": {
+                "type": "string",
+                "example": "台北市"
+              },
+              "state": {
+                "type": "string",
+                "example": "台灣"
+              },
+              "postalCode": {
+                "type": "string",
+                "example": "110"
+              },
+              "country": {
+                "type": "string",
+                "example": "Taiwan"
+              }
+            }
+          }
+        }
+      },
+      "PaymentResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "orderId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "amount": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "number",
+                "format": "double",
+                "example": 30000.00
+              },
+              "currency": {
+                "type": "string",
+                "example": "TWD"
+              },
+              "formattedAmount": {
+                "type": "string",
+                "example": "NT$30,000.00"
+              }
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": ["PENDING", "AUTHORIZED", "COMPLETED", "REFUNDED", "FAILED", "CANCELLED"],
+            "example": "PENDING"
+          },
+          "paymentMethod": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "example": "CREDIT_CARD"
+              },
+              "details": {
+                "type": "object",
+                "additionalProperties": true,
+                "example": {
+                  "cardHolderName": "王小明",
+                  "maskedCardNumber": "************1234",
+                  "expiryDate": {
+                    "month": 12,
+                    "year": 2025
+                  }
+                }
+              }
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2023-08-01T10:30:00Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2023-08-01T10:30:00Z"
+          }
+        }
+      },
+      "PaymentDetailResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "orderId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "amount": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "number",
+                "format": "double",
+                "example": 30000.00
+              },
+              "currency": {
+                "type": "string",
+                "example": "TWD"
+              },
+              "formattedAmount": {
+                "type": "string",
+                "example": "NT$30,000.00"
+              }
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": ["PENDING", "AUTHORIZED", "COMPLETED", "REFUNDED", "FAILED", "CANCELLED"],
+            "example": "COMPLETED"
+          },
+          "paymentMethod": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "example": "CREDIT_CARD"
+              },
+              "details": {
+                "type": "object",
+                "additionalProperties": true,
+                "example": {
+                  "cardHolderName": "王小明",
+                  "maskedCardNumber": "************1234",
+                  "expiryDate": {
+                    "month": 12,
+                    "year": 2025
+                  }
+                }
+              }
+            }
+          },
+          "transactionId": {
+            "type": "string",
+            "example": "TXN12345678"
+          },
+          "authorizationCode": {
+            "type": "string",
+            "example": "AUTH12345678"
+          },
+          "processorResponses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "example": "00"
+                },
+                "message": {
+                  "type": "string",
+                  "example": "Approved"
+                },
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time",
+                  "example": "2023-08-01T10:30:00Z"
+                }
+              }
+            }
+          },
+          "refunds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RefundResponse"
+            }
+          },
+          "statusHistory": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "example": "PENDING"
+                },
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time",
+                  "example": "2023-08-01T10:30:00Z"
+                },
+                "reason": {
+                  "type": "string",
+                  "example": "付款創建"
+                }
+              }
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2023-08-01T10:30:00Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2023-08-01T10:35:00Z"
+          }
+        }
+      },
+      "PagedPaymentResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentResponse"
+            }
+          },
+          "pageable": {
+            "type": "object",
+            "properties": {
+              "pageNumber": {
+                "type": "integer",
+                "example": 0
+              },
+              "pageSize": {
+                "type": "integer",
+                "example": 20
+              },
+              "sort": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "property": {
+                      "type": "string",
+                      "example": "createdAt"
+                    },
+                    "direction": {
+                      "type": "string",
+                      "example": "DESC"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "totalPages": {
+            "type": "integer",
+            "example": 5
+          },
+          "totalElements": {
+            "type": "integer",
+            "example": 100
+          },
+          "last": {
+            "type": "boolean",
+            "example": false
+          },
+          "first": {
+            "type": "boolean",
+            "example": true
+          },
+          "empty": {
+            "type": "boolean",
+            "example": false
+          },
+          "numberOfElements": {
+            "type": "integer",
+            "example": 20
+          }
+        }
+      },
+      "RefundResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "paymentId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "amount": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "number",
+                "format": "double",
+                "example": 30000.00
+              },
+              "currency": {
+                "type": "string",
+                "example": "TWD"
+              },
+              "formattedAmount": {
+                "type": "string",
+                "example": "NT$30,000.00"
+              }
+            }
+          },
+          "reason": {
+            "type": "string",
+            "example": "客戶退貨"
+          },
+          "notes": {
+            "type": "string",
+            "example": "產品有瑕疵"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["PENDING", "COMPLETED", "FAILED"],
+            "example": "COMPLETED"
+          },
+          "transactionId": {
+            "type": "string",
+            "example": "REF12345678"
+          },
+          "refundedBy": {
+            "type": "string",
+            "example": "財務人員"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2023-08-15T10:30:00Z"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2023-08-15T10:35:00Z"
+          }
+        }
+      },
+      "PaymentMethodResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "type": {
+            "type": "string",
+            "example": "CREDIT_CARD"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true,
+            "example": {
+              "cardHolderName": "王小明",
+              "maskedCardNumber": "************1234",
+              "expiryDate": {
+                "month": 12,
+                "year": 2025
+              }
+            }
+          },
+          "isDefault": {
+            "type": "boolean",
+            "example": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2023-07-15T08:30:00Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2023-07-15T08:30:00Z"
+          }
+        }
+      },
+      "TransactionResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "externalId": {
+            "type": "string",
+            "example": "TXN12345678"
+          },
+          "paymentId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "refundId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["PAYMENT", "REFUND", "CHARGEBACK", "FEE"],
+            "example": "PAYMENT"
+          },
+          "amount": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "number",
+                "format": "double",
+                "example": 30000.00
+              },
+              "currency": {
+                "type": "string",
+                "example": "TWD"
+              },
+              "formattedAmount": {
+                "type": "string",
+                "example": "NT$30,000.00"
+              }
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": ["SUCCESS", "PENDING", "FAILED"],
+            "example": "SUCCESS"
+          },
+          "processorResponse": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "example": "00"
+              },
+              "message": {
+                "type": "string",
+                "example": "Approved"
+              }
+            }
+          },
+          "paymentMethod": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "example": "CREDIT_CARD"
+              },
+              "details": {
+                "type": "object",
+                "additionalProperties": true,
+                "example": {
+                  "cardHolderName": "王小明",
+                  "maskedCardNumber": "************1234"
+                }
+              }
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2023-08-01T10:30:00Z"
+          },
+          "notes": {
+            "type": "string",
+            "example": "正常付款交易"
+          }
+        }
+      },
+      "PagedTransactionResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransactionResponse"
+            }
+          },
+          "pageable": {
+            "type": "object",
+            "properties": {
+              "pageNumber": {
+                "type": "integer",
+                "example": 0
+              },
+              "pageSize": {
+                "type": "integer",
+                "example": 20
+              },
+              "sort": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "property": {
+                      "type": "string",
+                      "example": "timestamp"
+                    },
+                    "direction": {
+                      "type": "string",
+                      "example": "DESC"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "totalPages": {
+            "type": "integer",
+            "example": 5
+          },
+          "totalElements": {
+            "type": "integer",
+            "example": 100
+          },
+          "last": {
+            "type": "boolean",
+            "example": false
+          },
+          "first": {
+            "type": "boolean",
+            "example": true
+          },
+          "empty": {
+            "type": "boolean",
+            "example": false
+          },
+          "numberOfElements": {
+            "type": "integer",
+            "example": 20
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2023-08-15T10:30:00Z"
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "example": 400
+          },
+          "error": {
+            "type": "string",
+            "example": "Bad Request"
+          },
+          "message": {
+            "type": "string",
+            "example": "付款金額不能為空"
+          },
+          "path": {
+            "type": "string",
+            "example": "/api/payments"
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "example": "amount"
+                },
+                "message": {
+                  "type": "string",
+                  "example": "付款金額不能為空"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}
