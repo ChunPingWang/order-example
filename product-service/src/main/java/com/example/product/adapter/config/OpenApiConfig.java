@@ -20,3 +20,5 @@ public class OpenApiConfig {
                     .name("Development Team")
                     .email("dev@example.com")));
     }
+}
+    }
